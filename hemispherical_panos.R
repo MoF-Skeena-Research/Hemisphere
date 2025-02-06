@@ -2,6 +2,7 @@ library(magick)
 library(hemispheR)
 library(dplyr)
 library("exifr")
+require(tictoc)
   
 
     ### Load necessary libraries:
@@ -25,11 +26,13 @@ library("exifr")
     ### Run the processing loop
     
     # Define the input path to the directory with panos
-    focal_path <- "C:/Users/myarham/OneDrive - Government of BC/OffSite-Trials/Michelle/Lw_Understory/Insta360_Canopy_photos/test folder" 
+    #drive = "C:/Users/myarham/OneDrive - Government of BC/"
+    drive = "D:/OneDrive - Government of BC/"
+    focal_path <- paste0(drive, "OffSite-Trials/Michelle/Lw_Understory/Insta360_Canopy_photos/test folder") 
     list_of_panos <- list.files(focal_path) # Get the list of all panos
     
     # Define the output directory path
-    output <- "C:/Users/myarham/OneDrive - Government of BC/OffSite-Trials/Michelle/Lw_Understory/Insta360_Canopy_photos/Test Results" # Instantiate an empty object to receive the results
+    output <- paste0(drive, "OffSite-Trials/Michelle/Lw_Understory/Insta360_Canopy_photos/Test Results") # Instantiate an empty object to receive the results
     
     # Loop through each pano in the list
     for(i in 1:length(list_of_panos)) {
@@ -110,13 +113,13 @@ library("exifr")
       
       ### Create black mask for the image (this isn't really neccessary, but makes the images look nicer)
       # Get the image mask vector file
-      image_mask <- image_read("C:/Users/myarham/OneDrive - Government of BC/OffSite-Trials/Michelle/Lw_Understory/Insta360_Canopy_photos/HemiPhotoMask.svg") %>%
+      image_mask <- image_read(paste0(drive, "OffSite-Trials/Michelle/Lw_Understory/Insta360_Canopy_photos/HemiPhotoMask.svg")) %>%
         image_transparent("white") %>%
         image_resize(geometry_size_pixels(width = pano_width, height = pano_width)) %>%
         image_convert("png")
       
       masked_hemisphere <- image_mosaic(c(pano_hemisphere, image_mask))
-      setwd("C:/Users/myarham/OneDrive - Government of BC/OffSite-Trials/Michelle/Lw_Understory/Insta360_Canopy_photos")
+      setwd(paste0(drive, "OffSite-Trials/Michelle/Lw_Understory/Insta360_Canopy_photos"))
       
       getwd()
       # We'll store the masked hemispheres in their own subdirectory.
@@ -133,7 +136,7 @@ library("exifr")
       
       ### For this example, I'm going to use Chiannuci's hemispheR package in order to keep this entire pipeline in R.
       # The next step is to import the image. hemispheR allows for lots of fine-tuning. Check out the docs to learn what all of the options are. These settings most closely replicate the processing I used in my 2021 paper. 
-      
+      tic()
       fisheye <- import_fisheye(masked_hemisphere_path,
                                 channel = '2BG',
                                 circ.mask = list(xc = pano_width/2, yc = pano_width/2, rc = pano_width/2),
@@ -141,9 +144,11 @@ library("exifr")
                                 stretch = FALSE,
                                 display = FALSE,
                                 message = FALSE)
+      toc()
       plot(fisheye)
       # Now, we need to binarize the images, converting all sky pizels to white and everything else to black (ideally). Again, there are lots of optionas available in hemispheR. You can decides which settings are right for you. However, I would suggest keeping zonal set to FALSE. Because spherical panoramas are exposing each of the 36 images separately, there is no need to use zonal FIX THIS SENTENCE.
       # I also suggest keeping export set to TRUE so that the binarized images will be saved into a subdirectory named 'results'.
+      tic()
       binimage <- binarize_fisheye(fisheye,
                                    method = 'Otsu',
                                    # We do NOT want to use zonal threshold estimation since this is done by the camera
@@ -151,13 +156,14 @@ library("exifr")
                                    manual = NULL,
                                    display = FALSE,
                                    export = TRUE)
+      toc()
       plot(binimage)
       # Unfortunately, hemispheR does not allow for estimation of understory light metrics. If you need light estimates, you'll have to take the binarized images and follow my instructions for implementing Gap Light Analyzer.
       
       ### Estimate canopy metrics
       # Assuming all you need is canopy metrics, we can continue with hemispheR and finalize the whole pipeline in R.
       
-  
+  tic()
       gapfrac <- gapfrac_fisheye(
         binimage,
         maxVZA = 90,
@@ -170,7 +176,7 @@ library("exifr")
         display = FALSE,
         message = FALSE
       )
-      
+    toc() 
       # Note that the 'x' column here is the gap fraction estimate.
       canopy_report <- canopy_fisheye(
         gapfrac
@@ -186,11 +192,12 @@ library("exifr")
           HemiFile = id
         )
       glimpse(output_report)
-      output <-
-        bind_rows(output,
-                  output_report)
+      #output <- as.data.frame(output)
+      # output <-
+      #   bind_rows(output,
+      #             output_report)
       
-      write.csv(output, "./canopy_output.csv", row.names = FALSE)
+      write.csv(output_report, "./canopy_output.csv", row.names = FALSE)
       
       T2 <- Sys.time()
       T_instance <- difftime(T2, T1, units = "secs")
