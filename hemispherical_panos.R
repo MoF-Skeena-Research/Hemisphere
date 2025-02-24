@@ -169,10 +169,10 @@ require(tictoc)
         maxVZA = 90,
         # Spherical panoramas are equidistant perforce
         lens = "equidistant",
-        startVZA = 0,
-        endVZA = 90,
-        nrings = 5,
-        nseg = 8,
+        # startVZA = 0,
+         endVZA = 80,
+        # nrings = 5,
+        # nseg = 8,
         display = FALSE,
         message = FALSE
       )
