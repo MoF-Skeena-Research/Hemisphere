@@ -169,12 +169,14 @@ require(tictoc)
         maxVZA = 90,
         # Spherical panoramas are equidistant perforce
         lens = "equidistant",
-        startVZA = 0,
-        endVZA = 90,
-        nrings = 5,
-        nseg = 8,
-        display = TRUE,
-        message = TRUE
+
+        # startVZA = 0,
+         endVZA = 80,
+        # nrings = 5,
+        # nseg = 8,
+        display = FALSE,
+        message = FALSE
+
       )
     toc() 
       # Note that the 'x' column here is the gap fraction estimate.
