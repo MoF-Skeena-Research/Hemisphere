@@ -142,8 +142,8 @@ require(tictoc)
                                 circ.mask = list(xc = pano_width/2, yc = pano_width/2, rc = pano_width/2),
                                 gamma = 2.2,
                                 stretch = FALSE,
-                                display = FALSE,
-                                message = FALSE)
+                                display = TRUE,
+                                message = TRUE)
       toc()
       plot(fisheye)
       # Now, we need to binarize the images, converting all sky pizels to white and everything else to black (ideally). Again, there are lots of optionas available in hemispheR. You can decides which settings are right for you. However, I would suggest keeping zonal set to FALSE. Because spherical panoramas are exposing each of the 36 images separately, there is no need to use zonal FIX THIS SENTENCE.
@@ -154,7 +154,7 @@ require(tictoc)
                                    # We do NOT want to use zonal threshold estimation since this is done by the camera
                                    zonal = FALSE,
                                    manual = NULL,
-                                   display = FALSE,
+                                   display = TRUE,
                                    export = TRUE)
       toc()
       plot(binimage)
@@ -173,8 +173,8 @@ require(tictoc)
         endVZA = 90,
         nrings = 5,
         nseg = 8,
-        display = FALSE,
-        message = FALSE
+        display = TRUE,
+        message = TRUE
       )
     toc() 
       # Note that the 'x' column here is the gap fraction estimate.
