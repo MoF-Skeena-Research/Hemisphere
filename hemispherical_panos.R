@@ -39,7 +39,7 @@ library(exiftoolr)
     for(i in 1:length(list_of_panos)) {
      if (i == 1) {
         T0 <- Sys.time() # Used for estimating remaining time
-      }
+     
       
 
       
@@ -176,7 +176,14 @@ library(exiftoolr)
         lens = "equidistant",
 
         # startVZA = 0,
+<<<<<<< HEAD
          endVZA = 80,  
+=======
+         #endVZA = 70,
+        # nrings = 5,
+        # nseg = 8,
+        display = FALSE,
+>>>>>>> 536b7541c98b1d70d06a87e8ecf398e77a7ed0df
         message = FALSE
 
       )
@@ -200,8 +207,11 @@ library(exiftoolr)
       output <-
         bind_rows(output,
                   output_report)
+<<<<<<< HEAD
       
       write.csv(output_report, "./canopy_output.csv", row.names = FALSE)
+=======
+>>>>>>> 536b7541c98b1d70d06a87e8ecf398e77a7ed0df
       
       #read.csv("./canopy_output.csv") %>% 
         #select(-X) %>%
@@ -213,5 +223,10 @@ library(exiftoolr)
       
       print(paste0("Completed ", i, " of ", length(list_of_panos), " images in ", round(T_instance, 0), " seconds."))
       print(paste0("Estimated ", round(((length(list_of_panos) - i) * T_average)/60, 1), " minutes remaining."))
+<<<<<<< HEAD
     }
 
+=======
+      }
+write.csv(output_report, "./canopy_output.csv", row.names = FALSE)
+>>>>>>> 536b7541c98b1d70d06a87e8ecf398e77a7ed0df

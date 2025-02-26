@@ -1,0 +1,266 @@
+---
+title: "Hemisphere"
+author: "WHMackenzie"
+date: "2025-02-26"
+output: html_document
+---
+
+```{r packages, include=FALSE}
+library(magick)
+library(hemispheR)
+library(dplyr)
+library("exifr")
+require(tictoc)
+require(data.table)
+library(parallel)
+library(foreach)
+library(doParallel)  
+library(tidyverse) # For data manipulation
+library(imager) # For image display    
+library(exifr) # For extracting metadata    
+# ImageMagick is a command line tool for image manipulation. We will call ImageMagick from within R using the magick package, but first you'll need to download [https://imagemagick.org/script/download.php] and install ImageMagick on your machine.
+    library(magick) # For image manipulation
+    # Check to ensure that ImageMagick is installed.
+    magick_config()$version 
+     # For binarizing and calculating some canopy metrics, we will use Chiannuci's hemispheR package, which we need to install from the development version.
+    library(devtools)
+    #devtools::install_git("https://gitlab.com/fchianucci/hemispheR")
+    library(hemispheR) # For binarization and estimating canopy measures
+```
+
+set up directories and read the mask
+```{r setup, include=FALSE}
+### Run the processing loop
+    
+    # Define the input path to the directory with panos
+    #drive = "C:/Users/myarham/OneDrive - Government of BC/"
+    drive = "D:/OneDrive - Government of BC/OffSite-Trials/Michelle/Lw_Understory/Insta360_Canopy_photos/"
+    focal_path <- paste0(drive, "test folder") 
+    list_of_panos <- list.files(focal_path) # Get the list of all panos
+    length(list_of_panos)
+    
+    # Define the output directory path
+    output <- paste0(drive, "Test Results") # Instantiate an empty object to receive the results
+
+mask_path <- paste0(drive, "HemiPhotoMask.svg")
+
+# Read the mask once
+image_mask <- image_read(mask_path) %>%
+  image_transparent("white") %>%
+  image_convert("png")
+
+# Create output directory if it doesn't exist
+output_dir <- paste0(drive, "masked_hemispheres/")
+if (!dir.exists(output_dir)) {
+  dir.create(output_dir)
+}
+
+# Create intermediate results directory if it doesn't exist
+intermediate_dir <- "./intermediate_results/"
+if (!dir.exists(intermediate_dir)) {
+  dir.create(intermediate_dir)
+}
+```
+
+Loop through all images in test folder
+Tried to parallelize the loop but was not successful due to magick package limitations.
+Instead produce individual output files in loop and then combine into a single combined file after the loop.
+This is more useful for adding new photos to existing processed images. 
+```{r process image loop}
+#i=1
+tic()
+T0 <- Sys.time()
+for (i in seq_along(list_of_panos)) {
+  T1 <- Sys.time() # Used for time check
+
+  # Construct the full path to the current image
+  focal_image_path <- file.path(focal_path, list_of_panos[i])
+  
+  # Extract the base name (without extension) of the current image
+  focal_image_name <- sub("\\.[^.]+$", "", basename(focal_image_path))
+  
+  # Print progress for debugging
+  print(paste("Processing image:", focal_image_name))
+  
+  # Read EXIF data
+  xmp_data <- read_exif(focal_image_path) %>%
+    select(SourceFile, Make, Model, Megapixels, GPSLatitude, GPSLongitude)
+  
+  # Read and process the image
+  pano <- image_read(focal_image_path)
+  pano_width <- image_info(pano)$width
+  image_heading <- 0 # Assuming heading is always 0
+  
+  pano_hemisphere <- pano %>%
+    image_crop(geometry_size_percent(100, 50)) %>%
+    image_resize(geometry_size_percent(100, 400)) %>%
+    image_distort("Polar", c(0), bestfit = TRUE) %>%
+    image_flip() %>%
+    image_rotate(image_heading) %>%
+    image_crop(paste0(pano_width, "x", pano_width, "-", pano_width/2, "-", pano_width/2))
+  
+  # Resize the mask to match pano width
+  resized_mask <- image_resize(image_mask, geometry_size_pixels(width = pano_width, height = pano_width))
+  
+  masked_hemisphere <- image_mosaic(c(pano_hemisphere, resized_mask))
+  
+  masked_hemisphere_path <- file.path(output_dir, paste0(focal_image_name, "hemi_masked.jpg"))
+  image_write(masked_hemisphere, masked_hemisphere_path)
+  
+  # Import and binarize the fisheye image
+  fisheye <- import_fisheye(masked_hemisphere_path,
+                            channel = '2BG',
+                            circ.mask = list(xc = pano_width/2, yc = pano_width/2, rc = pano_width/2),
+                            gamma = 2.2,
+                            stretch = FALSE,
+                            display = FALSE,
+                            message = FALSE)
+  
+  binimage <- binarize_fisheye(fisheye,
+                               method = 'Otsu',
+                               zonal = FALSE,
+                               manual = NULL,
+                               display = FALSE,
+                               export = TRUE)
+  
+  # Estimate canopy metrics
+  gapfrac <- gapfrac_fisheye(binimage,
+                             maxVZA = 90,
+                             lens = "equidistant",
+                             endVZA = 70, # 70 is default value removes near ground from analysis
+                             #nring = 3, # 7 is default value
+                             #nseg = 4, # 8 is default value
+                             display = TRUE,
+                             message = TRUE)
+  
+  canopy_report <- canopy_fisheye(gapfrac)
+  
+  output_report <- xmp_data %>%
+    bind_cols(canopy_report) %>%
+    rename(GF = x, HemiFile = id)
+  
+  # Save intermediate results to disk
+  intermediate_path <- file.path(intermediate_dir, paste0(focal_image_name, "_report.csv"))
+  write.csv(output_report, intermediate_path, row.names = FALSE)
+  
+  # Calculate and print processing times
+  T2 <- Sys.time()
+  T_instance <- difftime(T2, T1, units = "secs")
+  T_total <- difftime(T2, T0, units = "secs")
+  T_average <- T_total / i
+  
+  print(paste0("Completed ", i, " of ", length(list_of_panos), " images in ", round(T_instance, 0), " seconds."))
+  print(paste0("Estimated ", round(((length(list_of_panos) - i) * T_average) / 60, 1), " minutes remaining."))
+}
+
+# Combine intermediate results into a single CSV
+intermediate_files <- list.files(intermediate_dir, full.names = TRUE)
+output2 <- do.call(rbind, lapply(intermediate_files, read.csv))
+toc()
+# Write the final output to CSV
+write.csv(output2, "./canopy_output_all.csv", row.names = FALSE)
+```
+
+Loop through all images.
+Tried to parallelize the loop but was not successful due to magick package limitations.
+```{r}
+# tic()
+# # Initialize start time
+# T0 <- Sys.time()
+# # Initialize output data frame
+# output <- data.frame()
+# 
+# for (i in seq_along(list_of_panos)) {
+#   T1 <- Sys.time() # Used for time check
+# 
+#   # Construct the full path to the current image
+#   focal_image_path <- file.path(focal_path, list_of_panos[i])
+#   
+#   # Extract the base name (without extension) of the current image
+#   focal_image_name <- sub("\\.[^.]+$", "", basename(focal_image_path))
+#   
+#   # Print progress for debugging
+#   print(paste("Processing image:", focal_image_name))
+#   
+#   # Read EXIF data
+#   xmp_data <- read_exif(focal_image_path) %>%
+#     select(SourceFile, Make, Model, Megapixels, GPSLatitude, GPSLongitude)
+#   
+#   # Read and process the image
+#   pano <- image_read(focal_image_path)
+#   pano_width <- image_info(pano)$width
+#   image_heading <- 0 # Assuming heading is always 0
+#   
+#   pano_hemisphere <- pano %>%
+#     image_crop(geometry_size_percent(100, 50)) %>%
+#     image_resize(geometry_size_percent(100, 400)) %>%
+#     image_distort("Polar", c(0), bestfit = TRUE) %>%
+#     image_flip() %>%
+#     image_rotate(image_heading) %>%
+#     image_crop(paste0(pano_width, "x", pano_width, "-", pano_width/2, "-", pano_width/2))
+#   
+#   # Resize the mask to match pano width
+#   resized_mask <- image_resize(image_mask, geometry_size_pixels(width = pano_width, height = pano_width))
+#   
+#   masked_hemisphere <- image_mosaic(c(pano_hemisphere, resized_mask))
+#   
+#   masked_hemisphere_path <- file.path(output_dir, paste0(focal_image_name, "hemi_masked.jpg"))
+#   image_write(masked_hemisphere, masked_hemisphere_path)
+#   
+#   # Import and binarize the fisheye image
+#   fisheye <- import_fisheye(masked_hemisphere_path,
+#                             channel = '2BG',
+#                             circ.mask = list(xc = pano_width/2, yc = pano_width/2, rc = pano_width/2),
+#                             gamma = 2.2,
+#                             stretch = FALSE,
+#                             display = FALSE,
+#                             message = FALSE)
+#   
+#   binimage <- binarize_fisheye(fisheye,
+#                                method = 'Otsu',
+#                                zonal = FALSE,
+#                                manual = NULL,
+#                                display = FALSE,
+#                                export = TRUE)
+#   
+#   # Estimate canopy metrics
+#   gapfrac <- gapfrac_fisheye(binimage,
+#                              maxVZA = 90,
+#                              lens = "equidistant",
+#                              endVZA = 70, # 70 is default value
+#                              display = FALSE,
+#                              message = FALSE)
+#   
+#   canopy_report <- canopy_fisheye(gapfrac)
+#   
+#   output_report <- xmp_data %>%
+#     bind_cols(canopy_report) %>%
+#     rename(GF = x, HemiFile = id)
+# 
+#   # Save intermediate results to disk
+#   intermediate_path <- file.path(output_dir, paste0(focal_image_name, "_report.csv"))
+#   write.csv(output_report, intermediate_path, row.names = FALSE)
+# 
+#   # Write the final output to CSV
+# #write.csv(output, "./canopy_output.csv", row.names = FALSE)
+#   output <- bind_rows(output, output_report)
+#   
+#   # Calculate and print processing times
+#   T2 <- Sys.time()
+#   T_instance <- difftime(T2, T1, units = "secs")
+#   T_total <- difftime(T2, T0, units = "secs")
+#   T_average <- T_total / i
+#   
+#   print(paste0("Completed ", i, " of ", length(list_of_panos), " images in ", round(T_instance, 0), " seconds."))
+#   print(paste0("Estimated ", round(((length(list_of_panos) - i) * T_average) / 60, 1), " minutes remaining."))
+#   gc()
+# }
+#  
+# fwrite(output, paste0(drive,"./canopy_output_WHM.csv")) 
+# # Read intermediate results and combine them
+#   output2 <- do.call(rbind, lapply(output, read.csv))
+# # Write the final output to CSV
+# fwrite(output2, paste0(drive,"./canopy_output_WHM.csv")) 
+# toc()
+```
+
