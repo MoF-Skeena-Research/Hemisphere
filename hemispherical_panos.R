@@ -38,7 +38,7 @@ require(tictoc)
     for(i in 1:length(list_of_panos)) {
      # if (i == 1) {
         T0 <- Sys.time() # Used for estimating remaining time
-      }
+     
       
 
       
@@ -170,7 +170,7 @@ require(tictoc)
         # Spherical panoramas are equidistant perforce
         lens = "equidistant",
         # startVZA = 0,
-         endVZA = 80,
+         #endVZA = 70,
         # nrings = 5,
         # nseg = 8,
         display = FALSE,
@@ -192,12 +192,10 @@ require(tictoc)
           HemiFile = id
         )
       glimpse(output_report)
-      #output <- as.data.frame(output)
-      # output <-
-      #   bind_rows(output,
-      #             output_report)
-      
-      write.csv(output_report, "./canopy_output.csv", row.names = FALSE)
+      output <- as.data.frame(output)
+      output <-
+        bind_rows(output,
+                  output_report)
       
       T2 <- Sys.time()
       T_instance <- difftime(T2, T1, units = "secs")
@@ -207,4 +205,4 @@ require(tictoc)
       print(paste0("Completed ", i, " of ", length(list_of_panos), " images in ", round(T_instance, 0), " seconds."))
       print(paste0("Estimated ", round(((length(list_of_panos) - i) * T_average)/60, 1), " minutes remaining."))
       }
-
+write.csv(output_report, "./canopy_output.csv", row.names = FALSE)
