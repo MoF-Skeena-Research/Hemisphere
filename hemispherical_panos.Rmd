@@ -67,7 +67,9 @@ Tried to parallelize the loop but was not successful due to magick package limit
 Instead produce individual output files in loop and then combine into a single combined file after the loop.
 This is more useful for adding new photos to existing processed images. 
 ```{r process image loop}
+#i=1
 tic()
+T0 <- Sys.time()
 for (i in seq_along(list_of_panos)) {
   T1 <- Sys.time() # Used for time check
 
@@ -125,9 +127,11 @@ for (i in seq_along(list_of_panos)) {
   gapfrac <- gapfrac_fisheye(binimage,
                              maxVZA = 90,
                              lens = "equidistant",
-                             endVZA = 80,
-                             display = FALSE,
-                             message = FALSE)
+                             endVZA = 70, # 70 is default value removes near ground from analysis
+                             #nring = 3, # 7 is default value
+                             #nseg = 4, # 8 is default value
+                             display = TRUE,
+                             message = TRUE)
   
   canopy_report <- canopy_fisheye(gapfrac)
   
