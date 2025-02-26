@@ -1,42 +1,43 @@
 library(magick)
 library(hemispheR)
 library(dplyr)
-library("exifr")
+library(exifr)
 require(tictoc)
-  
+library(tidyverse)
+library(imager)
+library(exiftoolr)
+#install.packages("exifr")  
+#install.packages("hemispheR")
 
-    ### Load necessary libraries:
-    library(tidyverse) # For data manipulation
-    
-    # ImageMagick is a command line tool for image manipulation. We will call ImageMagick from within R using the magick package, but first you'll need to download [https://imagemagick.org/script/download.php] and install ImageMagick on your machine.
-    library(magick) # For image manipulation
+
     # Check to ensure that ImageMagick is installed.
     magick_config()$version 
     
-    # ImageR also requires ImageMagick
-    library(imager) # For image display
     
+    
+    exiftool = "C:/Users/WillMa Kenzie/AppData/Local/RStudio/exiftool-13.21_64"
     library(exifr) # For extracting metadata
-    
     # For binarizing and calculating some canopy metrics, we will use Chiannuci's hemispheR package, which we need to install from the development version.
     library(devtools)
-    devtools::install_git("https://gitlab.com/fchianucci/hemispheR")
+    #devtools::install_git("https://gitlab.com/fchianucci/hemispheR")
     library(hemispheR) # For binarization and estimating canopy measures
     
     ### Run the processing loop
     
     # Define the input path to the directory with panos
     #drive = "C:/Users/myarham/OneDrive - Government of BC/"
-    drive = "D:/OneDrive - Government of BC/"
-    focal_path <- paste0(drive, "OffSite-Trials/Michelle/Lw_Understory/Insta360_Canopy_photos/test folder") 
+    drive = "E:/OneDrive - Government of BC/"
+    
+    focal_path <- paste0(drive, "OffSite-Trials/Michelle/Lw_Understory/Insta360_Canopy_photos/test folder/") 
     list_of_panos <- list.files(focal_path) # Get the list of all panos
     
     # Define the output directory path
-    output <- paste0(drive, "OffSite-Trials/Michelle/Lw_Understory/Insta360_Canopy_photos/Test Results") # Instantiate an empty object to receive the results
+    #output <- paste0(drive, "E:/OneDrive - Government of BC/OffSite-Trials/Michelle/Lw_Understory/Insta360_Canopy_photos/Test Results") # Instantiate an empty object to receive the results
+    output <- paste0(drive, "OffSite-Trials/Michelle/Lw_Understory/Insta360_Canopy_photos/Test Results") 
     
     # Loop through each pano in the list
     for(i in 1:length(list_of_panos)) {
-     # if (i == 1) {
+     if (i == 1) {
         T0 <- Sys.time() # Used for estimating remaining time
       }
       
@@ -47,7 +48,8 @@ require(tictoc)
       T1 <- Sys.time() # Used for time check
       
       # Construct the full path to the current image
-      focal_image_path <- paste0(focal_path, "/", list_of_panos[i])
+     #Edit focal_image_path <- paste0(focal_path, list_of_panos)
+      focal_image_path <- paste0(focal_path, list_of_panos[i])
       
       # Extract the base name (without extension) of the current image
       focal_image_name <- sub("\\.[^.]+$", "", basename(focal_image_path))
@@ -56,24 +58,26 @@ require(tictoc)
       print(paste("Processing image:", focal_image_name))
       
       # Add additional processing steps here...
-    
+      pano <- image_read(focal_image_path)
     
     # Calculate and print total processing time
     T_total <- Sys.time() - T0
     print(paste("Total processing time:", T_total))
     
+    # read_exif(focal_image_path) %>%
+      # glimpse
       # You can choose which variables you'd like to retain
-      xmp_data <- 
-        read_exif(focal_image_path) %>%
-        select(
-          SourceFile,
-          Make,
-          Model,
-          Megapixels,
-          GPSLatitude,
-          GPSLongitude#,
-          #GPSAltitude,
-        )
+      # xmp_data <-
+      # read_exif(focal_image_path) %>%
+      # select(
+      # SourceFile,
+      # Make,
+      # Model,
+      # Megapixels,
+      # GPSLatitude,
+      # GPSLongitude#,
+      # GPSAltitude,
+        # )
       
       # The first step in the process is to convert the equirectangular image from our phone into a hemispherical image.
       
@@ -131,6 +135,7 @@ require(tictoc)
       masked_hemisphere_path <- paste0("./masked_hemispheres/", focal_image_name, "hemi_masked.jpg") # Set the filepath for the new image
       
       image_write(masked_hemisphere, masked_hemisphere_path) # Save the masked hemispherical image
+    
       
       # At this point, you can process the hemispherical images however you'd like to calculate canopy and light metrics.
       
@@ -145,7 +150,7 @@ require(tictoc)
                                 display = TRUE,
                                 message = TRUE)
       toc()
-      plot(fisheye)
+      #plot(fisheye)
       # Now, we need to binarize the images, converting all sky pizels to white and everything else to black (ideally). Again, there are lots of optionas available in hemispheR. You can decides which settings are right for you. However, I would suggest keeping zonal set to FALSE. Because spherical panoramas are exposing each of the 36 images separately, there is no need to use zonal FIX THIS SENTENCE.
       # I also suggest keeping export set to TRUE so that the binarized images will be saved into a subdirectory named 'results'.
       tic()
@@ -157,7 +162,7 @@ require(tictoc)
                                    display = TRUE,
                                    export = TRUE)
       toc()
-      plot(binimage)
+      #plot(binimage)
       # Unfortunately, hemispheR does not allow for estimation of understory light metrics. If you need light estimates, you'll have to take the binarized images and follow my instructions for implementing Gap Light Analyzer.
       
       ### Estimate canopy metrics
@@ -171,10 +176,7 @@ require(tictoc)
         lens = "equidistant",
 
         # startVZA = 0,
-         endVZA = 80,
-        # nrings = 5,
-        # nseg = 8,
-        display = FALSE,
+         endVZA = 80,  
         message = FALSE
 
       )
@@ -194,13 +196,16 @@ require(tictoc)
           HemiFile = id
         )
       glimpse(output_report)
-      #output <- as.data.frame(output)
-      # output <-
-      #   bind_rows(output,
-      #             output_report)
+      output <- as.data.frame(output)
+      output <-
+        bind_rows(output,
+                  output_report)
       
       write.csv(output_report, "./canopy_output.csv", row.names = FALSE)
       
+      #read.csv("./canopy_output.csv") %>% 
+        #select(-X) %>%
+        #glimpse()
       T2 <- Sys.time()
       T_instance <- difftime(T2, T1, units = "secs")
       T_total <- difftime(T2, T0, units = "secs")
@@ -208,5 +213,5 @@ require(tictoc)
       
       print(paste0("Completed ", i, " of ", length(list_of_panos), " images in ", round(T_instance, 0), " seconds."))
       print(paste0("Estimated ", round(((length(list_of_panos) - i) * T_average)/60, 1), " minutes remaining."))
-      }
+    }
 
