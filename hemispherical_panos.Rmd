@@ -151,10 +151,10 @@ for (i in seq_along(list_of_panos)) {
 
 # Combine intermediate results into a single CSV
 intermediate_files <- list.files(intermediate_dir, full.names = TRUE)
-output <- do.call(rbind, lapply(intermediate_files, read.csv))
+output2 <- do.call(rbind, lapply(intermediate_files, read.csv))
 toc()
 # Write the final output to CSV
-write.csv(output, "./canopy_output.csv", row.names = FALSE)
+write.csv(output2, "./canopy_output_all.csv", row.names = FALSE)
 ```
 
 Loop through all images.
