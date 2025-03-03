@@ -1,0 +1,151 @@
+---
+title: "Canopy Openness"
+author: "Myarham"
+date: "2025-03-03"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+#install.packages("ggplot2") 
+#install.packages("readxl")
+#install.packages("RColorBrewer")
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+library(viridis)
+
+```
+
+## R Markdown
+
+Pull data
+
+```{r cars}
+df <- read.csv("D:/OneDrive - Government of BC/OffSite-Trials/Michelle/Lw_Understory/Insta360_Canopy_photos/canopy_output_all_BB_BC.csv")
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+ggplot(data = df, aes(x = species, y = DIFN, fill = species)) +
+geom_boxplot(alpha = 0.6, outlier.shape = 16, outlier.size = 2) +  # Softer transparency & outlier emphasis
+scale_fill_viridis_d(option = "plasma") +  # Use better scientific color scale
+theme_minimal(base_size = 16) +  # Clean journal theme with readable font size
+theme(
+legend.position = "none",  # Remove legend
+axis.text.x = element_text(angle = 45, hjust = 1, face = "bold"),
+axis.title.x = element_blank(),  # Remove x-axis label (species)
+panel.grid.major = element_line(color = "gray80", linetype = "dashed"),  # Subtle grid lines
+panel.grid.minor = element_blank(),  # Remove minor grid lines for clarity
+plot.title = element_text(face = "bold", size = 18, hjust = 0.5)  # Center and bold title
+) +
+labs(
+title = "Canopy Openness",
+x = "Species",
+y = "DIFN",
+fill = "Species"
+)+
+facet_wrap(~site_label)
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r}
+head(df)
+
+
+ # Plot
+#Check that the 'site' column exists
+head(df)
+#
+# # Plot
+ggplot(data = df, aes(x = species, y = DIFN, fill = site_label)) +
+geom_boxplot(alpha = 0.6, outlier.shape = 16, outlier.size = 2) +
+scale_fill_viridis_d(option = "plasma") +  # Using a color scale for sites
+theme_minimal(base_size = 16) +  # Clean theme
+theme(
+legend.position = "top",  # Position the legend at the top
+axis.text.x = element_text(angle = 45, hjust = 1, face = "bold"),  # Rotate x-axis labels
+axis.title.x = element_blank(),  # Remove x-axis label
+panel.grid.major = element_line(color = "gray80", linetype = "dashed"),
+panel.grid.minor = element_blank(),
+plot.title = element_text(face = "bold", size = 18, hjust = 0.5)
+) +
+labs(
+title = "Canopy Openness Across Sites",
+y = "DIFN (Diffuse Non-Interceptance)",
+fill = "Site"
+)
+```
+
+# Plot for MTA.ell
+```{r}
+ggplot(data = df, aes(x = species, y = MTA.ell, fill = species)) +
+geom_boxplot(alpha = 0.6, outlier.shape = 16, outlier.size = 2) +  # Softer transparency & outlier emphasis
+scale_fill_viridis_d(option = "plasma") +  # Use better scientific color scale
+theme_minimal(base_size = 16) +  # Clean journal theme with readable font size
+theme(
+legend.position = "none",  # Remove legend
+axis.text.x = element_text(angle = 45, hjust = 1, face = "bold"),
+axis.title.x = element_blank(),  # Remove x-axis label (species)
+panel.grid.major = element_line(color = "gray80", linetype = "dashed"),  # Subtle grid lines
+panel.grid.minor = element_blank(),  # Remove minor grid lines for clarity
+plot.title = element_text(face = "bold", size = 18, hjust = 0.5)  # Center and bold title
+) +
+labs(
+title = "MTA.ell",
+x = "Species",
+y = "",
+fill = "Species"
+)+
+facet_wrap(~site_label)
+```
+
+
+```{r}
+ggplot(data = df, aes(x = species, y = GF, fill = species)) +
+geom_boxplot(alpha = 0.6, outlier.shape = 16, outlier.size = 2) +  # Softer transparency & outlier emphasis
+scale_fill_viridis_d(option = "plasma") +  # Use better scientific color scale
+theme_minimal(base_size = 16) +  # Clean journal theme with readable font size
+theme(
+legend.position = "none",  # Remove legend
+axis.text.x = element_text(angle = 45, hjust = 1, face = "bold"),
+axis.title.x = element_blank(),  # Remove x-axis label (species)
+panel.grid.major = element_line(color = "gray80", linetype = "dashed"),  # Subtle grid lines
+panel.grid.minor = element_blank(),  # Remove minor grid lines for clarity
+plot.title = element_text(face = "bold", size = 18, hjust = 0.5)  # Center and bold title
+) +
+labs(
+title = "GF",
+x = "Species",
+y = "",
+fill = "Species"
+)+
+facet_wrap(~site_label)
+```
+
+
+```{r}
+ggplot(data = df, aes(x = species, y = Le, fill = species)) +
+geom_boxplot(alpha = 0.6, outlier.shape = 16, outlier.size = 2) +  # Softer transparency & outlier emphasis
+scale_fill_viridis_d(option = "plasma") +  # Use better scientific color scale
+theme_minimal(base_size = 16) +  # Clean journal theme with readable font size
+theme(
+legend.position = "none",  # Remove legend
+axis.text.x = element_text(angle = 45, hjust = 1, face = "bold"),
+axis.title.x = element_blank(),  # Remove x-axis label (species)
+panel.grid.major = element_line(color = "gray80", linetype = "dashed"),  # Subtle grid lines
+panel.grid.minor = element_blank(),  # Remove minor grid lines for clarity
+plot.title = element_text(face = "bold", size = 18, hjust = 0.5)  # Center and bold title
+) +
+labs(
+title = "Le",
+x = "Species",
+y = "",
+fill = "Species"
+)+
+facet_wrap(~site_label)
+```
