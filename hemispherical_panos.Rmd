@@ -12,9 +12,9 @@ library(dplyr)
 library("exifr")
 require(tictoc)
 require(data.table)
-library(parallel)
-library(foreach)
-library(doParallel)  
+#library(parallel)
+#library(foreach)
+#library(doParallel)  
 library(tidyverse) # For data manipulation
 library(imager) # For image display    
 library(exifr) # For extracting metadata    
