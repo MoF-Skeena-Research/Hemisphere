@@ -12,7 +12,7 @@ library(dplyr)
 library("exifr")
 require(tictoc)
 require(data.table)
-#library(parallel)
+library(parallel)
 #library(foreach)
 #library(doParallel)  
 library(tidyverse) # For data manipulation
@@ -83,29 +83,29 @@ for (i in seq_along(list_of_panos)) {
   print(paste("Processing image:", focal_image_name))
   
   # Read EXIF data
-  xmp_data <- read_exif(focal_image_path) %>%
-    select(SourceFile, Make, Model, Megapixels, GPSLatitude, GPSLongitude)
-  
+  # xmp_data <- read_exif(focal_image_path) %>%
+  #   select(SourceFile, Make, Model, Megapixels, #GPSLatitude, GPSLongitude)
+  # 
   # Read and process the image
-  pano <- image_read(focal_image_path)
-  pano_width <- image_info(pano)$width
-  image_heading <- 0 # Assuming heading is always 0
-  
-  pano_hemisphere <- pano %>%
-    image_crop(geometry_size_percent(100, 50)) %>%
-    image_resize(geometry_size_percent(100, 400)) %>%
-    image_distort("Polar", c(0), bestfit = TRUE) %>%
-    image_flip() %>%
-    image_rotate(image_heading) %>%
-    image_crop(paste0(pano_width, "x", pano_width, "-", pano_width/2, "-", pano_width/2))
-  
+  # pano <- image_read(focal_image_path)
+  # pano_width <- image_info(pano)$width
+  # image_heading <- 0 # Assuming heading is always 0
+  # 
+  # pano_hemisphere <- pano %>%
+  #   image_crop(geometry_size_percent(100, 50)) %>%
+  #   image_resize(geometry_size_percent(100, 400)) %>%
+  #   image_distort("Polar", c(0), bestfit = TRUE) %>%
+  #   image_flip() %>%
+  #   image_rotate(image_heading) %>%
+  #   image_crop(paste0(pano_width, "x", pano_width, "-", pano_width/2, "-", pano_width/2))
+  # 
   # Resize the mask to match pano width
-  resized_mask <- image_resize(image_mask, geometry_size_pixels(width = pano_width, height = pano_width))
-  
-  masked_hemisphere <- image_mosaic(c(pano_hemisphere, resized_mask))
-  
-  masked_hemisphere_path <- file.path(output_dir, paste0(focal_image_name, "hemi_masked.jpg"))
-  image_write(masked_hemisphere, masked_hemisphere_path)
+  # resized_mask <- image_resize(image_mask, geometry_size_pixels(width = pano_width, height = pano_width))
+  # 
+  # masked_hemisphere <- image_mosaic(c(pano_hemisphere, resized_mask))
+  # 
+  # masked_hemisphere_path <- file.path(output_dir, paste0(focal_image_name, "hemi_masked.jpg"))
+  # image_write(masked_hemisphere, masked_hemisphere_path)
   
   # Import and binarize the fisheye image
   fisheye <- import_fisheye(masked_hemisphere_path,

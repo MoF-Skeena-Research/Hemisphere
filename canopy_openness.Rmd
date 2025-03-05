@@ -43,23 +43,43 @@ panel.grid.minor = element_blank(),  # Remove minor grid lines for clarity
 plot.title = element_text(face = "bold", size = 18, hjust = 0.5)  # Center and bold title
 ) +
 labs(
-title = "Canopy Openness",
+title = "",
 x = "Species",
-y = "DIFN",
+y = "Canopy Openness %",
 fill = "Species"
 )+
 facet_wrap(~site_label)
 
 ```
 
+#faucet grid
+```{r}
+ggplot(data = df, aes(x = species, y = DIFN, group = species, color = species)) +
+  geom_line(linewidth = 1.2) +  # Line plot for trends
+  geom_point(size = 3, alpha = 0.7) +  # Add points for clarity
+  scale_color_viridis_d(option = "plasma") +  
+  theme_minimal(base_size = 16) +  
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1, face = "bold"),
+    axis.title.x = element_blank(),
+    panel.grid.major = element_line(color = "gray80", linetype = "dashed"),
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(face = "bold", size = 18, hjust = 0.5)
+  ) +
+  labs(
+    title = "",
+    x = "Species",
+    y = "Canopy Openness %",
+    color = "Species"
+  ) +
+  facet_grid(rows = vars(site_label))
+
+
+```
+
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
 ```{r}
-head(df)
-
-
- # Plot
-#Check that the 'site' column exists
-head(df)
 #
 # # Plot
 ggplot(data = df, aes(x = species, y = DIFN, fill = site_label)) +
@@ -76,7 +96,7 @@ plot.title = element_text(face = "bold", size = 18, hjust = 0.5)
 ) +
 labs(
 title = "Canopy Openness Across Sites",
-y = "DIFN (Diffuse Non-Interceptance)",
+y = "DIFN",
 fill = "Site"
 )
 ```

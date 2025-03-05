@@ -131,8 +131,12 @@ for(i in 1:length(list_of_images)) {
   print(paste0("Completed ", i, " of ", length(list_of_images), " images."))
 }
 
-# Save final output
-write.csv(output, "./canopy_output.csv", row.names = FALSE)
+# Combine intermediate results into a single CSV
+intermediate_files <- list.files(intermediate_dir, full.names = TRUE)
+output2 <- do.call(rbind, lapply(intermediate_files, read.csv))
+toc()
+# Write the final output to CSV
+write.csv(output2, "./canopy_output_all.csv", row.names = FALSE)
 
 ```
 ```
