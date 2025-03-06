@@ -1,142 +1,248 @@
 ---
 title: "Fisheye_canopy"
 author: "Myarham"
-date: "2025-03-04"
+date: "2025-03-05"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
+```{r packages, include=FALSE}
 library(magick)
 library(hemispheR)
 library(dplyr)
-library(exifr)
+library("exifr")
 require(tictoc)
-library(tidyverse)
-library(imager)
-library(exiftoolr)
-
-# Ensure ImageMagick is installed
-magick_config()$version 
+require(data.table)
+library(parallel)
+#library(foreach)
+#library(doParallel)  
+library(tidyverse) # For data manipulation
+library(imager) # For image display    
+library(exifr) # For extracting metadata 
+library(magrittr)
+# ImageMagick is a command line tool for image manipulation. We will call ImageMagick from within R using the magick package, but first you'll need to download [https://imagemagick.org/script/download.php] and install ImageMagick on your machine.
+    library(magick) # For image manipulation
+    # Check to ensure that ImageMagick is installed.
+    magick_config()$version 
      # For binarizing and calculating some canopy metrics, we will use Chiannuci's hemispheR package, which we need to install from the development version.
     library(devtools)
     #devtools::install_git("https://gitlab.com/fchianucci/hemispheR")
     library(hemispheR) # For binarization and estimating canopy measures
 ```
+set up directories and read the mask
+```{r setup, include=FALSE}
+### Run the processing loop
+    
+    # Define the input path to the directory with panos
+    #drive = "C:/Users/myarham/OneDrive - Government of BC/"
+    drive = "D:/OneDrive - Government of BC/OffSite-Trials/Michelle/Lw_Understory/Insta360_Canopy_photos/"
+    focal_path <- paste0(drive, "test folder") 
+    list_of_panos <- list.files(focal_path) # Get the list of all panos
+    length(list_of_panos)
+    
+    # Define the output directory path
+    output <- paste0(drive, "Test Results") # Instantiate an empty object to receive the results
 
-## R Markdown
+mask_path <- paste0(drive, "HemiPhotoMask.svg")
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+# Read the mask once
+image_mask <- image_read(mask_path) %>%
+  image_transparent("white") %>%
+  image_convert("png")
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
- 
-```{r}
-# Define the input path to the directory with 360 images
-drive = "D:/OneDrive - Government of BC/"
-focal_path <- paste0(drive, "OffSite-Trials/Michelle/Lw_Understory/Insta360_Canopy_photos/test folder/") 
-list_of_images <- list.files(focal_path) 
+# Create output directory if it doesn't exist
+output_dir <- paste0(drive, "masked_hemispheres/")
+if (!dir.exists(output_dir)) {
+  dir.create(output_dir)
+}
 
-# Define the output directory path
-output <- paste0(drive, "OffSite-Trials/Michelle/Lw_Understory/Insta360_Canopy_photos/Test_Results") 
- 
+# Create intermediate results directory if it doesn't exist
+intermediate_dir <- "./intermediate_results/"
+if (!dir.exists(intermediate_dir)) {
+  dir.create(intermediate_dir)
+  image_path <- file.path(focal_path, list_of_panos[i]) # Original BMP file
+
+# Read, Convert, and Save as JPG
+image_read(image_path) %>%
+  image_convert(format = "jpeg") %>%
+  image_write(file.path(focal_path, paste0(sub("\\.bmp$", "", basename(image_path)), ".jpg")))
+
+# Now read the newly saved JPG to process
+focal_image_path <- file.path(focal_path, paste0(sub("\\.bmp$", "", basename(image_path)), ".jpg"))
+fisheye_image <- image_read(focal_image_path)
+}
 ```
 
+Loop through all images in test folder
+Tried to parallelize the loop but was not successful due to magick package limitations.
+Instead produce individual output files in loop and then combine into a single combined file after the loop.
+This is more useful for adding new photos to existing processed images.
 
+```{r process image loop}
 
-```{r pressure, echo=FALSE}
+#i=1
+tic()
+T0 <- Sys.time()
+list_of_panos <- list.files(focal_path, full.names = TRUE)  # Get full file paths
 
-for(i in 1:length(list_of_images)) {
-  if (i == 1) {
-    T0 <- Sys.time() 
+print("Files detected in test folder:")
+print(list_of_panos)
+
+if (length(list_of_panos) == 0) {
+  stop("⚠️ No images found! Check your 'test folder' path.")
+}
+for (i in seq_along(list_of_panos)) {
+  focal_image_path <- list_of_panos[i]  # Full path
+  
+  print(paste("Processing hemispherical image:", focal_image_path))
+  
+  # Ensure file exists
+  if (!file.exists(focal_image_path)) {
+    print("⚠️ File not found! Skipping...")
+    next
   }
+# Read the image and get dimensions
+fisheye_image <- image_read(focal_image_path) %>%
   
-  T1 <- Sys.time() 
-  focal_image_path <- paste0(focal_path, list_of_images[i])
-  focal_image_name <- sub("\\.[^.]+$", "", basename(focal_image_path))
-  print(paste("Processing image:", focal_image_name))
-  
-  # Read the hemispherical image (already in correct format)
-  image <- image_read(focal_image_path)
+  image_convert(format = "jpeg")
+img_info <- image_info(fisheye_image)
+img_width <- img_info$width
+img_height <- img_info$height
 
-  # Extract metadata (Heading is not needed for hemispherical images)
-  image_heading <- 0
-  hemisphere_image <- image %>%
-  image_crop(geometry_size_pixels(width = image_width, height = image_width/2)) %>%  # Ensure we crop correctly
-  image_resize(geometry_size_pixels(width = image_width, height = image_width)) %>% # Expand properly
-  image_flip() %>%
-  image_rotate(image_heading) %>%
-  image_crop(paste0(image_width, "x", image_width, "-", image_width/2, "-", image_width/2)) # Ensure final centered crop
-  # Load and apply mask (Ensure mask matches the hemisphere dimensions)
-  image_width <- image_info(image)$width
-  
-  image_mask <- image_read(paste0(drive, "OffSite-Trials/Michelle/Lw_Understory/Insta360_Canopy_photos/HemiPhotoMask.svg")) %>%
-        image_transparent("white") %>%
-        image_resize(geometry_size_pixels(width = image_width, height = image_width)) %>%
-        image_convert("png")
+# Ensure square image dimensions
+img_size <- min(img_width, img_height)
 
-  # Apply mask
-  masked_hemisphere <- image_mosaic(c(image, image_mask))
+# Dynamically set center (xc, yc) and a safe radius (rc)
+xc <- img_size / 2
+yc <- img_size / 2
 
-  # Save processed image
-  if (!dir.exists("./masked_hemispheres/")) {
-    dir.create("./masked_hemispheres/")
-  }
-  masked_hemisphere_path <- paste0("./masked_hemispheres/", focal_image_name, "_hemi_masked.jpg")
-  image_write(masked_hemisphere, masked_hemisphere_path)
-  
-  # Analyze the processed image
-  tic()
-  fisheye <- import_fisheye(masked_hemisphere_path,
+# Adjust rc to prevent it from exceeding the image boundary
+rc <- min(xc, yc) - 1  # Subtracting 1 to ensure it stays inside
+
+# Print parameters to check values
+print(paste("Updated xc, yc, rc:", xc, yc, rc))
+
+# Import and binarize the fisheye image
+fisheye <- import_fisheye(focal_image_path,
                           channel = '2BG',
-                          circ.mask = list(xc = image_width/2, yc = image_width/2, rc = image_width/2),
+                          circ.mask = list(xc = xc, yc = yc, rc = rc),
                           gamma = 2.2,
                           stretch = FALSE,
-                          display = TRUE,
-                          message = TRUE)
-  plot(fisheye)
-  toc()
-  
-  # Binarize the fisheye image
+                          display = FALSE,
+                          message = FALSE)
+
+
+  # Binarize the image
   binimage <- binarize_fisheye(fisheye,
                                method = 'Otsu',
                                zonal = FALSE,
                                manual = NULL,
-                               display = TRUE,
+                               display = FALSE,
                                export = TRUE)
-  plot(binimage)
 
-  # Ensure binary values (0,1)
-  binimage[binimage > 0] <- 1
-  binimage[binimage == 0] <- 0
-
-  # Compute gap fraction
-  tic()
+  # Estimate canopy metrics
   gapfrac <- gapfrac_fisheye(binimage,
                              maxVZA = 90,
                              lens = "equidistant",
-                             endVZA = 80, # 70 is default value removes near ground from analysis
-                             #nring = 3, # 7 is default value
-                             #nseg = 4, # 8 is default value
+                             endVZA = 90,
                              display = TRUE,
                              message = TRUE)
-  toc()
-  
-  # Compute canopy report
+
   canopy_report <- canopy_fisheye(gapfrac)
 
-  # Store results
-  output_report <- canopy_report %>% rename(GF = x, HemiFile = id)
-  #output <- bind_rows(output, output_report)
+  # Save intermediate results
+  output_path <- file.path(intermediate_dir, paste0(basename(focal_image_path), "_report.csv"))
+  write.csv(canopy_report, output_path, row.names = FALSE)
 
-  T2 <- Sys.time()
-  print(paste0("Completed ", i, " of ", length(list_of_images), " images."))
+  print(paste("✅ Completed:", focal_image_path))
 }
 
-# Combine intermediate results into a single CSV
-intermediate_files <- list.files(intermediate_dir, full.names = TRUE)
-output2 <- do.call(rbind, lapply(intermediate_files, read.csv))
-toc()
-# Write the final output to CSV
-write.csv(output2, "./canopy_output_all.csv", row.names = FALSE)
 
-```
+  # # Construct the full path to the current image
+  # focal_image_path <- file.path(focal_path, list_of_panos[i])
+  # 
+  # # Extract the base name (without extension) of the current image
+  # focal_image_name <- sub("\\.[^.]+$", "", basename(focal_image_path))
+  # 
+  # # Print progress for debugging
+  # print(paste("Processing image:", focal_image_name))
+  # 
+  
+  # Read EXIF data
+  # xmp_data <- read_exif(focal_image_path) %>%
+  #   select(SourceFile, Make, Model, Megapixels, #GPSLatitude, GPSLongitude)
+  # 
+  # Read and process the image
+  # pano <- image_read(focal_image_path)
+  # pano_width <- image_info(pano)$width
+  # image_heading <- 0 # Assuming heading is always 0
+  # 
+  # pano_hemisphere <- pano %>%
+  #   image_crop(geometry_size_percent(100, 50)) %>%
+  #   image_resize(geometry_size_percent(100, 400)) %>%
+  #   image_distort("Polar", c(0), bestfit = TRUE) %>%
+  #   image_flip() %>%
+  #   image_rotate(image_heading) %>%
+  #   image_crop(paste0(pano_width, "x", pano_width, "-", pano_width/2, "-", pano_width/2))
+  # 
+  # Resize the mask to match pano width
+  # resized_mask <- image_resize(image_mask, geometry_size_pixels(width = pano_width, height = pano_width))
+  # 
+  # masked_hemisphere <- image_mosaic(c(pano_hemisphere, resized_mask))
+  # 
+  # masked_hemisphere_path <- file.path(output_dir, paste0(focal_image_name, "hemi_masked.jpg"))
+  # image_write(masked_hemisphere, masked_hemisphere_path)
+  
+  # Import and binarize the fisheye image
+#   fisheye <- import_fisheye(masked_hemisphere_path,
+#                             channel = '2BG',
+#                             circ.mask = list(xc = pano_width/2, yc = pano_width/2, rc = pano_width/2),
+#                             gamma = 2.2,
+#                             stretch = FALSE,
+#                             display = FALSE,
+#                             message = FALSE)
+#   
+#   binimage <- binarize_fisheye(fisheye,
+#                                method = 'Otsu',
+#                                zonal = FALSE,
+#                                manual = NULL,
+#                                display = FALSE,
+#                                export = TRUE)
+#   
+#   # Estimate canopy metrics
+#   gapfrac <- gapfrac_fisheye(binimage,
+#                              maxVZA = 90,
+#                              lens = "equidistant",
+#                              endVZA = 85, # 70 is default value removes near ground from analysis
+#                              #nring = 3, # 7 is default value
+#                              #nseg = 4, # 8 is default value
+#                              display = TRUE,
+#                              message = TRUE)
+#   
+#   canopy_report <- canopy_fisheye(gapfrac)
+#   
+#   output_report <- xmp_data %>%
+#     bind_cols(canopy_report) %>%
+#     rename(GF = x, HemiFile = id)
+#   
+#   # Save intermediate results to disk
+#   intermediate_path <- file.path(intermediate_dir, paste0(focal_image_name, "_report.csv"))
+#   write.csv(output_report, intermediate_path, row.names = FALSE)
+#   
+#   # Calculate and print processing times
+#   T2 <- Sys.time()
+#   T_instance <- difftime(T2, T1, units = "secs")
+#   T_total <- difftime(T2, T0, units = "secs")
+#   T_average <- T_total / i
+#   
+#   print(paste0("Completed ", i, " of ", length(list_of_panos), " images in ", round(T_instance, 0), " seconds."))
+#   print(paste0("Estimated ", round(((length(list_of_panos) - i) * T_average) / 60, 1), " minutes remaining."))
+# }
+# 
+# # Combine intermediate results into a single CSV
+# intermediate_files <- list.files(intermediate_dir, full.names = TRUE)
+# output2 <- do.call(rbind, lapply(intermediate_files, read.csv))
+# toc()
+# # Write the final output to CSV
+# write.csv(output2, "./canopy_output_all.csv", row.names = FALSE)
+#   
 ```
