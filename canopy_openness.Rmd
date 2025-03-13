@@ -13,6 +13,10 @@ library(ggplot2)
 library(tidyr)
 library(dplyr)
 library(viridis)
+library(forcats)
+library(gridExtra)
+library(grid)  # Load grid for textGrob
+library(gridExtra)  # Load gridExtra for arranging plots
 
 ```
 
@@ -21,151 +25,175 @@ library(viridis)
 Pull data
 
 ```{r cars}
+# Load Data
 df <- read.csv("D:/OneDrive - Government of BC/OffSite-Trials/Michelle/Lw_Understory/Insta360_Canopy_photos/canopy_output_all_BB_BC.csv")
 
-```
+# Define custom colors for each species
+species_colors <- c(
+  "Fd1" = "#1B4F72",   # Deep navy blue
+  "Fd2" = "#117A65",   # Muted teal
+  "Lw" = "#D4A017",    # Goldenrod
+  "Py" = "#9C640C",    # Earthy brown
+  "Pw" = "#566573",    # Cool gray
+  "Sx" = "#C0392B",    # Muted brick red
+  "Pl" = "#2874A6",    # Soft sky blue
+  "Sx Planted" = "#7D3C98",  # Deep violet
+  "Pl Planted" = "#2C3E50"   # Charcoal gray
+)
 
-## Including Plots
+# Add "*" to species labels where tall_shrub_layer == "Y" but keep original colors
+df <- df %>%
+  mutate(species_label = ifelse(tall_shrub_layer == "Y", paste0(species, "*"), species)) %>%
+  mutate(species_label = factor(species_label, levels = sort(unique(species_label))))  # Ensure ordered factors
 
-You can also embed plots, for example:
+# Create the main plot
+p <- ggplot(data = df, aes(x = species_label, y = DIFN, fill = species)) +
+  geom_boxplot(alpha = 0.6, outlier.shape = 16, outlier.size = 2) +  
+  scale_fill_manual(values = species_colors) +  # Keep original species colors
+  theme_minimal(base_size = 20) +  # Larger text
+  theme(
+    legend.position = "none",  
+    axis.text.x = element_text(angle = 45, hjust = 1, face = "bold"),
+    axis.title.x = element_blank(),  
+    panel.grid.major = element_line(color = "gray80", linetype = "dashed"),  
+    panel.grid.minor = element_blank(),  
+    plot.title = element_text(face = "bold", size = 22, hjust = 0.5),  
+    panel.background = element_rect(fill = "white"),  
+    plot.background = element_rect(fill = "white")  
+  ) +
+  labs(
+    title = "Canopy Openness by Site",
+    x = "Species",
+    y = "Canopy Openness (%)",
+    fill = "Species"
+  ) +
+  facet_wrap(~site_label, scales = "free_x")  
 
-```{r pressure, echo=FALSE}
-ggplot(data = df, aes(x = species, y = DIFN, fill = species)) +
-geom_boxplot(alpha = 0.6, outlier.shape = 16, outlier.size = 2) +  # Softer transparency & outlier emphasis
-scale_fill_viridis_d(option = "plasma") +  # Use better scientific color scale
-theme_minimal(base_size = 16) +  # Clean journal theme with readable font size
-theme(
-legend.position = "none",  # Remove legend
-axis.text.x = element_text(angle = 45, hjust = 1, face = "bold"),
-axis.title.x = element_blank(),  # Remove x-axis label (species)
-panel.grid.major = element_line(color = "gray80", linetype = "dashed"),  # Subtle grid lines
-panel.grid.minor = element_blank(),  # Remove minor grid lines for clarity
-plot.title = element_text(face = "bold", size = 18, hjust = 0.5)  # Center and bold title
-) +
-labs(
-title = "",
-x = "Species",
-y = "Canopy Openness %",
-fill = "Species"
-)+
-facet_wrap(~site_label)
+# Create the footnote as a separate grob
+footnote <- textGrob("* Tall shrubs present", gp = gpar(fontsize = 14, fontface = "italic"))
 
+# Combine the plot and footnote
+final_plot <- grid.arrange(p, footnote, ncol = 1, heights = c(10, 1))
+
+# Save the combined figure
+ggsave(filename = "canopy_openness_by_SITE.png", plot = final_plot, width = 15, height = 15, dpi = 300)
+
+
+# Define custom colors for each species
+#species_colors <- c(
+#"Fd1" = "#D55E00",  # Red-orange
+#"Fd2" = "#0072B2",  # Blue
+#"Lw" = "#009E73",  # Green
+#"Py" = "#E69F00",  # Orange
+#"Pw" = "#F0E442",  # Yellow
+#"Sx" = "#CC79A7",  # Pink/magenta
+#"Pl" = "#56B4E9",  # Light blue
+#"Sx PLanted" = "#8E44AD",  # Deep purple
+#"Pl Planted" = "#00CCCC"  # Cyan
+#)
+
+#df_filtered <- df %>%
+ #filter(tall_shrub_layer != "Y") %>%  # Remove rows where tall_shrub_layer is "Y"
+  #mutate(species = factor(species, levels = sort(unique(species))))  # Alphabetical order
+
+# Verify if filtering worked
+#table(df_filtered$tall_shrub_layer)  # Should not contain "Y"
+
+#p <- ggplot(data = df_filtered, aes(x = species, y = DIFN, fill = species)) +
+#geom_boxplot(alpha = 0.6, outlier.shape = 16, outlier.size = 2) +
+#scale_fill_manual(values = species_colors) +  # Use predefined colors
+#theme_minimal(base_size = 20) +  # Larger text
+#theme(
+#legend.position = "none",
+#axis.text.x = element_text(angle = 45, hjust = 1, face = "bold"),
+#axis.title.x = element_blank(),
+#panel.grid.major = element_line(color = "gray80", linetype = "dashed"),
+#panel.grid.minor = element_blank(),
+#plot.title = element_text(face = "bold", size = 22, hjust = 0.5),
+#panel.background = element_rect(fill = "white"),
+#plot.background = element_rect(fill = "white")
+#) +
+#labs(
+#title = "Canopy Openness by Species",
+#x = "Species",
+#y = "Canopy Openness (%)",
+#fill = "Species"
+#) +
+#facet_wrap(~site_label, scales = "free_x")
+
+# Save the plot
+#ggsave(filename = "canopy_openness_by_SITE.png", plot = p, width = 15, height = 10, dpi = 300)
+
+
+# ggplot(data = df, aes(x = species, y = DIFN, fill = species)) +
+# geom_boxplot(alpha = 0.6, outlier.shape = 16, outlier.size = 2) +  # Softer transparency & outlier emphasis
+# scale_fill_viridis_d(option = "plasma") +  # Use better scientific color scale
+# theme_minimal(base_size = 16) +  # Clean journal theme with readable font size
+# theme(
+# legend.position = "none",  # Remove legend
+# axis.text.x = element_text(angle = 45, hjust = 1, face = "bold"),
+# axis.title.x = element_blank(),  # Remove x-axis label (species)
+# panel.grid.major = element_line(color = "gray80", linetype = "dashed"),  # Subtle grid lines
+# panel.grid.minor = element_blank(),  # Remove minor grid lines for clarity
+# plot.title = element_text(face = "bold", size = 18, hjust = 0.5)  # Center and bold title
+# ) +
+# labs(
+# title = "",
+# x = "Species",
+# y = "Canopy Openness %",
+# fill = "Species"
+# )+
+# facet_wrap(~site_label)
+# scale_x_discrete(drop = TRUE)
 ```
 
 #faucet grid
 ```{r}
-ggplot(data = df, aes(x = species, y = DIFN, group = species, color = species)) +
-  geom_line(linewidth = 1.2) +  # Line plot for trends
-  geom_point(size = 3, alpha = 0.7) +  # Add points for clarity
-  scale_color_viridis_d(option = "plasma") +  
-  theme_minimal(base_size = 16) +  
+# Define custom colors for each species
+species_colors <- c(
+  "Fd1" = "#1B4F72",   # Deep navy blue
+  "Fd2" = "#117A65",   # Muted teal
+  "Lw" = "#D4A017",    # Goldenrod
+  "Py" = "#9C640C",    # Earthy brown
+  "Pw" = "#566573",    # Cool gray
+  "Sx" = "#C0392B",    # Muted brick red
+  "Pl" = "#2874A6",    # Soft sky blue
+  "Sx Planted" = "#7D3C98",  # Deep violet
+  "Pl Planted" = "#2C3E50"   # Charcoal gray
+)
+
+# Filter out rows where tall_shrub_layer is "Y" and reorder species alphabetically
+df_filtered <- df %>%
+  filter(tall_shrub_layer != "Y") %>%
+  mutate(species = factor(species, levels = sort(unique(species))))  # Alphabetical order
+
+# Verify that "Y" is removed
+table(df_filtered$tall_shrub_layer)  # Should not contain "Y"
+
+# Plot using df_filtered
+p <- ggplot(data = df_filtered, aes(x = species, y = DIFN, fill = species)) +
+  geom_boxplot(alpha = 0.6, outlier.shape = 16, outlier.size = 2) +
+  scale_fill_manual(values = species_colors) +  # Use predefined colors
+  theme_minimal(base_size = 20) +  # Larger text
   theme(
-    legend.position = "none",
+    legend.position = "none",  
     axis.text.x = element_text(angle = 45, hjust = 1, face = "bold"),
-    axis.title.x = element_blank(),
-    panel.grid.major = element_line(color = "gray80", linetype = "dashed"),
-    panel.grid.minor = element_blank(),
-    plot.title = element_text(face = "bold", size = 18, hjust = 0.5)
+    axis.title.x = element_blank(),  
+    panel.grid.major = element_line(color = "gray80", linetype = "dashed"),  
+    panel.grid.minor = element_blank(),  
+    plot.title = element_text(face = "bold", size = 22, hjust = 0.5),  
+    panel.background = element_rect(fill = "white"),  
+    plot.background = element_rect(fill = "white"),  
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 1)  # Add border
   ) +
   labs(
-    title = "",
+    title = "Canopy Openness by Species",
     x = "Species",
-    y = "Canopy Openness %",
-    color = "Species"
-  ) +
-  facet_grid(rows = vars(site_label))
+    y = "Canopy Openness (%)",
+    fill = "Species"
+  )
 
+# Save the plot
+ggsave(filename = "canopy_openness_by_species.png", plot = p, width = 15, height = 10, dpi = 300)
 
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
-```{r}
-#
-# # Plot
-ggplot(data = df, aes(x = species, y = DIFN, fill = site_label)) +
-geom_boxplot(alpha = 0.6, outlier.shape = 16, outlier.size = 2) +
-scale_fill_viridis_d(option = "plasma") +  # Using a color scale for sites
-theme_minimal(base_size = 16) +  # Clean theme
-theme(
-legend.position = "top",  # Position the legend at the top
-axis.text.x = element_text(angle = 45, hjust = 1, face = "bold"),  # Rotate x-axis labels
-axis.title.x = element_blank(),  # Remove x-axis label
-panel.grid.major = element_line(color = "gray80", linetype = "dashed"),
-panel.grid.minor = element_blank(),
-plot.title = element_text(face = "bold", size = 18, hjust = 0.5)
-) +
-labs(
-title = "Canopy Openness Across Sites",
-y = "DIFN",
-fill = "Site"
-)
-```
-
-# Plot for MTA.ell
-```{r}
-ggplot(data = df, aes(x = species, y = MTA.ell, fill = species)) +
-geom_boxplot(alpha = 0.6, outlier.shape = 16, outlier.size = 2) +  # Softer transparency & outlier emphasis
-scale_fill_viridis_d(option = "plasma") +  # Use better scientific color scale
-theme_minimal(base_size = 16) +  # Clean journal theme with readable font size
-theme(
-legend.position = "none",  # Remove legend
-axis.text.x = element_text(angle = 45, hjust = 1, face = "bold"),
-axis.title.x = element_blank(),  # Remove x-axis label (species)
-panel.grid.major = element_line(color = "gray80", linetype = "dashed"),  # Subtle grid lines
-panel.grid.minor = element_blank(),  # Remove minor grid lines for clarity
-plot.title = element_text(face = "bold", size = 18, hjust = 0.5)  # Center and bold title
-) +
-labs(
-title = "MTA.ell",
-x = "Species",
-y = "",
-fill = "Species"
-)+
-facet_wrap(~site_label)
-```
-
-
-```{r}
-ggplot(data = df, aes(x = species, y = GF, fill = species)) +
-geom_boxplot(alpha = 0.6, outlier.shape = 16, outlier.size = 2) +  # Softer transparency & outlier emphasis
-scale_fill_viridis_d(option = "plasma") +  # Use better scientific color scale
-theme_minimal(base_size = 16) +  # Clean journal theme with readable font size
-theme(
-legend.position = "none",  # Remove legend
-axis.text.x = element_text(angle = 45, hjust = 1, face = "bold"),
-axis.title.x = element_blank(),  # Remove x-axis label (species)
-panel.grid.major = element_line(color = "gray80", linetype = "dashed"),  # Subtle grid lines
-panel.grid.minor = element_blank(),  # Remove minor grid lines for clarity
-plot.title = element_text(face = "bold", size = 18, hjust = 0.5)  # Center and bold title
-) +
-labs(
-title = "GF",
-x = "Species",
-y = "",
-fill = "Species"
-)+
-facet_wrap(~site_label)
-```
-
-
-```{r}
-ggplot(data = df, aes(x = species, y = Le, fill = species)) +
-geom_boxplot(alpha = 0.6, outlier.shape = 16, outlier.size = 2) +  # Softer transparency & outlier emphasis
-scale_fill_viridis_d(option = "plasma") +  # Use better scientific color scale
-theme_minimal(base_size = 16) +  # Clean journal theme with readable font size
-theme(
-legend.position = "none",  # Remove legend
-axis.text.x = element_text(angle = 45, hjust = 1, face = "bold"),
-axis.title.x = element_blank(),  # Remove x-axis label (species)
-panel.grid.major = element_line(color = "gray80", linetype = "dashed"),  # Subtle grid lines
-panel.grid.minor = element_blank(),  # Remove minor grid lines for clarity
-plot.title = element_text(face = "bold", size = 18, hjust = 0.5)  # Center and bold title
-) +
-labs(
-title = "Le",
-x = "Species",
-y = "",
-fill = "Species"
-)+
-facet_wrap(~site_label)
 ```
