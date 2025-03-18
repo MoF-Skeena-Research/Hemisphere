@@ -1,0 +1,47 @@
+---
+title: "DIFN Comparision"
+author: "Myarham"
+date: "2025-03-13"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+
+# Read the CSV files
+data1 <- read.csv("D:/OneDrive - Government of BC/OffSite-Trials/Michelle/Lw_Understory/Insta360_Canopy_photos/canopy_output_all_BB_BC.csv")
+data2 <- read.csv("D:/Github/Hemisphere/canopy_output_all.csv")
+```
+
+
+
+```{r cars}
+# Merge the data frames by 'plot_label'
+merged_data <- merge(data1, data2, by = "plot_label", suffixes = c("_file1", "_file2"))
+
+# Create the ggplot
+ggplot(merged_data, aes(x = plot_label)) +
+  geom_point(aes(y = DIFN_file1, color = "Insta360")) +
+  geom_point(aes(y = DIFN_file2, color = "Paula's")) +
+  labs(title = "Comparison of DIFN between Two Files",
+       x = "Plot Label",
+       y = "DIFN") +
+  scale_color_manual(name = "Source", values = c("Insta360" = "blue", "Paula's" = "red")) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+ggsave("DIFN_comparison.png", width = 12, height = 6, dpi = 300)
+
+
+```
+
+
+
+```{r pressure, echo=FALSE}
+# Merge the data frames by 'plot_label'
+
+
+
+```
+
+

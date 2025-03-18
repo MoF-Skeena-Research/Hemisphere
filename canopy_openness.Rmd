@@ -26,7 +26,7 @@ Pull data
 
 ```{r cars}
 # Load Data
-df <- read.csv("D:/OneDrive - Government of BC/OffSite-Trials/Michelle/Lw_Understory/Insta360_Canopy_photos/canopy_output_all_BB_BC.csv")
+df <- read.csv("D:/OneDrive - Government of BC/OffSite-Trials/Michelle/Lw_Understory/Insta360_Canopy_photos/canopy_output_all_clean.csv")
 
 # Define custom colors for each species
 species_colors <- c(

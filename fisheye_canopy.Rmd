@@ -48,7 +48,8 @@ mask_path <- paste0(drive, "HemiPhotoMask.svg")
 image_mask <- image_read(mask_path) %>%
   image_transparent("white") %>%
   image_convert("png")
-
+# Set Fixed Crop Size
+crop_size <- 1000  # Set the desired crop size (e.g., 1000x1000 pixels)
 # Create output directory if it doesn't exist
 output_dir <- paste0(drive, "masked_hemispheres/")
 if (!dir.exists(output_dir)) {
@@ -78,9 +79,7 @@ Instead produce individual output files in loop and then combine into a single c
 This is more useful for adding new photos to existing processed images.
 
 ```{r process image loop}
-
-#i=1
-tic()
+ tic()
 T0 <- Sys.time()
 list_of_panos <- list.files(focal_path, full.names = TRUE)  # Get full file paths
 
@@ -90,46 +89,62 @@ print(list_of_panos)
 if (length(list_of_panos) == 0) {
   stop("⚠️ No images found! Check your 'test folder' path.")
 }
+
 for (i in seq_along(list_of_panos)) {
   focal_image_path <- list_of_panos[i]  # Full path
-  
+
   print(paste("Processing hemispherical image:", focal_image_path))
-  
+
   # Ensure file exists
   if (!file.exists(focal_image_path)) {
     print("⚠️ File not found! Skipping...")
     next
   }
-# Read the image and get dimensions
-fisheye_image <- image_read(focal_image_path) %>%
-  
-  image_convert(format = "jpeg")
-img_info <- image_info(fisheye_image)
-img_width <- img_info$width
-img_height <- img_info$height
 
-# Ensure square image dimensions
-img_size <- min(img_width, img_height)
+  # Read the image
+  fisheye_image <- image_read(focal_image_path)
 
-# Dynamically set center (xc, yc) and a safe radius (rc)
-xc <- img_size / 2
-yc <- img_size / 2
+  # Get image dimensions
+  img_info <- image_info(fisheye_image)
+  img_width <- img_info$width
+  img_height <- img_info$height
 
-# Adjust rc to prevent it from exceeding the image boundary
-rc <- min(xc, yc) - 1  # Subtracting 1 to ensure it stays inside
+  # Ensure square image dimensions
+  # img_size <- min(img_width, img_height)
 
-# Print parameters to check values
-print(paste("Updated xc, yc, rc:", xc, yc, rc))
+  # Dynamically set center (xc, yc)
+  xc <- img_width / 2
+  yc <- img_height / 2
 
-# Import and binarize the fisheye image
-fisheye <- import_fisheye(focal_image_path,
-                          channel = '2BG',
-                          circ.mask = list(xc = xc, yc = yc, rc = rc),
-                          gamma = 2.2,
-                          stretch = FALSE,
-                          display = FALSE,
-                          message = FALSE)
+  # Crop the image to a square
+  fisheye_image <- image_crop(fisheye_image, paste0(img_size, "x", img_size, "+",
+                                                    (img_width - img_size) / 2, "+",
+                                                    (img_height - img_size) / 2))
 
+  # Convert to JPEG (apply conversion to the fisheye_image object)
+  fisheye_image <- image_convert(fisheye_image, format = "jpeg")
+
+  # Save cropped image for debugging
+  image_write(fisheye_image, "debug_cropped_image.jpg")
+
+  # Adjust rc to prevent it from exceeding the image boundary
+  rc <- min(xc, yc) - 1  # Subtracting 1 to ensure it stays inside
+
+  # Print parameters to check values
+  print(paste("Updated xc, yc, rc:", xc, yc, rc))
+for (file in intermediate_files) {
+  print(file)  # Check file names
+  print(readLines(file, n = 5))  # Print first 5 lines
+}
+
+  # Import and binarize the fisheye image
+  fisheye <- import_fisheye(focal_image_path,
+                            channel = '2BG',
+                            circ.mask = list(xc = xc, yc = yc, rc = rc),
+                            gamma = 2.2,
+                            stretch = FALSE,
+                            display = FALSE,
+                            message = FALSE)
 
   # Binarize the image
   binimage <- binarize_fisheye(fisheye,
@@ -139,22 +154,37 @@ fisheye <- import_fisheye(focal_image_path,
                                display = FALSE,
                                export = TRUE)
 
+  # Print binarized image to check values
+  print(binimage)
+
   # Estimate canopy metrics
   gapfrac <- gapfrac_fisheye(binimage,
                              maxVZA = 90,
                              lens = "equidistant",
-                             endVZA = 90,
+                             endVZA = 70, # 70 is default value removes near ground from analysis
+                             nring = 7, # 7 is default value
+                             nseg = 8, # 8 is default value
                              display = TRUE,
                              message = TRUE)
 
   canopy_report <- canopy_fisheye(gapfrac)
 
   # Save intermediate results
-  output_path <- file.path(intermediate_dir, paste0(basename(focal_image_path), "_report.csv"))
-  write.csv(canopy_report, output_path, row.names = FALSE)
+  # output_path <- file.path(intermediate_dir, paste0(basename(focal_image_path), "_report.csv"))
+  # write.csv(canopy_report, output_path, row.names = FALSE)
 
   print(paste("✅ Completed:", focal_image_path))
+
+# Combine intermediate results into a single CSV
+intermediate_files <- list.files(intermediate_dir, pattern = "\\.csv$", full.names = TRUE)
+
+  #intermediate_files <- list.files(intermediate_dir, full.names = TRUE)
+output2 <- do.call(rbind, lapply(intermediate_files, read.csv))
+toc()
+# Write the final output to CSV
+write.csv(output2, "./canopy_output_all.csv", row.names = FALSE)
 }
+
 
 
   # # Construct the full path to the current image

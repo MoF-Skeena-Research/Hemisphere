@@ -18,6 +18,7 @@ library(parallel)
 library(tidyverse) # For data manipulation
 library(imager) # For image display    
 library(exifr) # For extracting metadata    
+library(terra)
 # ImageMagick is a command line tool for image manipulation. We will call ImageMagick from within R using the magick package, but first you'll need to download [https://imagemagick.org/script/download.php] and install ImageMagick on your machine.
     library(magick) # For image manipulation
     # Check to ensure that ImageMagick is installed.
@@ -83,29 +84,34 @@ for (i in seq_along(list_of_panos)) {
   print(paste("Processing image:", focal_image_name))
   
   # Read EXIF data
-  # xmp_data <- read_exif(focal_image_path) %>%
-  #   select(SourceFile, Make, Model, Megapixels, #GPSLatitude, GPSLongitude)
-  # 
+  xmp_data <- read_exif(focal_image_path) %>%
+  select(SourceFile, Make, Model, Megapixels, GPSLatitude, GPSLongitude)
+
   # Read and process the image
-  # pano <- image_read(focal_image_path)
-  # pano_width <- image_info(pano)$width
-  # image_heading <- 0 # Assuming heading is always 0
+  pano <- image_read(focal_image_path)
+  pano_width <- image_info(pano)$width
+  image_heading <- 0 # Assuming heading is always 0
   # 
-  # pano_hemisphere <- pano %>%
-  #   image_crop(geometry_size_percent(100, 50)) %>%
-  #   image_resize(geometry_size_percent(100, 400)) %>%
-  #   image_distort("Polar", c(0), bestfit = TRUE) %>%
-  #   image_flip() %>%
-  #   image_rotate(image_heading) %>%
-  #   image_crop(paste0(pano_width, "x", pano_width, "-", pano_width/2, "-", pano_width/2))
+  pano_hemisphere <- pano %>%
+    image_crop(geometry_size_percent(100, 50)) %>%
+    image_resize(geometry_size_percent(100, 400)) %>%
+    image_distort("Polar", c(0), bestfit = TRUE) %>%
+    image_flip() %>%
+    image_rotate(image_heading) %>%
+    image_crop(paste0(pano_width, "x", pano_width, "-", pano_width/2, "-", pano_width/2))
   # 
   # Resize the mask to match pano width
-  # resized_mask <- image_resize(image_mask, geometry_size_pixels(width = pano_width, height = pano_width))
-  # 
-  # masked_hemisphere <- image_mosaic(c(pano_hemisphere, resized_mask))
-  # 
-  # masked_hemisphere_path <- file.path(output_dir, paste0(focal_image_name, "hemi_masked.jpg"))
-  # image_write(masked_hemisphere, masked_hemisphere_path)
+  resized_mask <- image_resize(image_mask, geometry_size_pixels(width = pano_width, height = pano_width))
+
+  masked_hemisphere <- image_mosaic(c(pano_hemisphere, resized_mask))
+
+  masked_hemisphere_path <- file.path(output_dir, paste0(focal_image_name, "hemi_masked.jpg"))
+  image_write(masked_hemisphere, masked_hemisphere_path)
+  test_image <- image_read(focal_image_path) %>% 
+  image_convert(format = "jpeg") %>%
+  image_write(path = focal_image_path, format = "jpeg")
+
+print(image_info(image_read(focal_image_path))) 
   
   # Import and binarize the fisheye image
   fisheye <- import_fisheye(masked_hemisphere_path,
@@ -115,24 +121,47 @@ for (i in seq_along(list_of_panos)) {
                             stretch = FALSE,
                             display = FALSE,
                             message = FALSE)
-  
+
   binimage <- binarize_fisheye(fisheye,
                                method = 'Otsu',
                                zonal = FALSE,
                                manual = NULL,
-                               display = FALSE,
+                               display = TRUE,
                                export = TRUE)
+}
+print(class(binimage))  # Should be "SpatRaster"
+print(binimage)         # Check contents
+
+
+# gapfrac_fisheye(binimage,
+#   maxVZA = 90,
+#   lens = "equidistant",
+#   startVZA = 0,
+#   endVZA = 70,
+#   nrings = 7,
+#   nseg = 8,
+#   message = FALSE,
+#   display = FALSE)
   
-  # Estimate canopy metrics
+  #Estimate canopy metrics
   gapfrac <- gapfrac_fisheye(binimage,
                              maxVZA = 90,
                              lens = "equidistant",
                              endVZA = 70, # 70 is default value removes near ground from analysis
-                             #nring = 3, # 7 is default value
-                             #nseg = 4, # 8 is default value
+                             nring = 7, # 7 is default value
+                             nseg = 8, # 8 is default value
                              display = TRUE,
                              message = TRUE)
-  
+
+  # gapfrac <- gapfrac_fisheye(binimage_raster, 
+  #                          maxVZA = 90, 
+  #                          lens = "equidistant",
+  #                          endVZA = 70, 
+  #                          nring = 3, 
+  #                          nseg = 4, 
+  #                          display = TRUE, 
+  #                          message = TRUE)
+
   canopy_report <- canopy_fisheye(gapfrac)
   
   output_report <- xmp_data %>%
@@ -151,7 +180,7 @@ for (i in seq_along(list_of_panos)) {
   
   print(paste0("Completed ", i, " of ", length(list_of_panos), " images in ", round(T_instance, 0), " seconds."))
   print(paste0("Estimated ", round(((length(list_of_panos) - i) * T_average) / 60, 1), " minutes remaining."))
-}
+
 
 # Combine intermediate results into a single CSV
 intermediate_files <- list.files(intermediate_dir, full.names = TRUE)
