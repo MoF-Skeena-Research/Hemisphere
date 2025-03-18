@@ -11,8 +11,8 @@ library(ggplot2)
 library(dplyr)
 
 # Read the CSV files
-data1 <- read.csv("D:/OneDrive - Government of BC/OffSite-Trials/Michelle/Lw_Understory/Insta360_Canopy_photos/canopy_output_all_BB_BC.csv")
-data2 <- read.csv("D:/Github/Hemisphere/canopy_output_all.csv")
+data1 <- read.csv("D:/OneDrive - Government of BC/OffSite-Trials/Michelle/Lw_Understory/Insta360_Canopy_photos/canopy_output_all_clean.csv")
+data2 <- read.csv("D:/OneDrive - Government of BC/OffSite-Trials/Michelle/Lw_Understory/Insta360_Canopy_photos/paula's_canopy_output_all.csv")
 ```
 
 
