@@ -1,0 +1,91 @@
+---
+title: "Hemisphere"
+author: "WHMackenzie"
+date: "2025-02-26"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(magick)# For image manipulation
+library(hemispheR)# For binarization and estimating canopy measures
+library(dplyr)
+require(tictoc)
+require(data.table)
+library(parallel)
+library(foreach)
+library(doParallel)  
+library(tidyverse) # For data manipulation
+library(imager) # For image display    
+library(exifr) # For extracting metadata  
+library(future.apply)
+library(devtools)
+require(tictoc)
+```
+set up directories and read the mask
+```{r}
+base_dir <- "./canopy_photos"
+
+dir.create("canopy_metrics_final", showWarnings=FALSE)
+# dir.create(file.path(base_dir,"binarized"), showWarnings=FALSE)
+# dir.create(file.path(base_dir,"metrics"), showWarnings=FALSE)
+# dir.create(file.path(base_dir,"review_panels"), showWarnings=FALSE)
+## selected options from tests in prepare_canopy_metrics.rmd
+options <- expand.grid(
+  channel = c("2BG"),
+  gamma = c(1.6),
+  stretch = c(FALSE)
+)
+
+mask <- file.path(base_dir,"mask","HemiPhotoMask.svg")
+
+image_mask <- image_read(mask) |>
+  image_transparent("white") |>
+  image_convert("png")
+```
+
+
+Calculate canopy metrics
+```{r}
+source("./_functions/binarize_image.R")
+source("./_functions/calculate_canopy_metrics.R")
+source("./_functions/make_par_image.R")
+source("./_functions/calculate_yearly_PAR.R")
+source("./_functions/calculate_gap_fraction.R")
+
+
+
+selected_images <- list.files(
+  file.path(base_dir,"standardized_hemi"),
+  full.names=TRUE
+)
+
+#selected_images <- selected_images[1]
+
+
+
+
+tic()
+
+all_metrics <- future_lapply(
+  selected_images,
+  calculate_canopy_metrics,
+  options = options,
+  future.seed = TRUE
+)
+
+toc()
+
+metric_table <- bind_rows(all_metrics) |> dplyr::select(plot_id, site, canopy, DIFN, PAR_Transmit, PAR_TotalUnder, Le, L, Omega,
+                                                        Direct_Transmit, Diffuse_Transmit, MTA.ell, LX, LXG1, LXG2, everything())
+
+
+fwrite(
+  metric_table,
+  file.path(
+    "canopy_metrics_final",
+    "hemisphere_light_metrics.csv"
+  )
+)
+```
+
+

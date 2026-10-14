@@ -1,0 +1,308 @@
+---
+title: "Hemisphere"
+author: "WHMackenzie"
+date: "2025-02-26"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(magick)# For image manipulation
+library(hemispheR)# For binarization and estimating canopy measures
+library(dplyr)
+require(tictoc)
+require(data.table)
+library(parallel)
+library(foreach)
+library(doParallel)  
+library(tidyverse) # For data manipulation
+library(imager) # For image display    
+library(exifr) # For extracting metadata  
+library(future.apply)
+library(devtools)
+require(tictoc)
+```
+set up directories and read the mask
+```{r}
+base_dir <- "./canopy_photos"
+
+dir.create(file.path(base_dir,"selected_images"), showWarnings=FALSE)
+dir.create(file.path(base_dir,"binarized"), showWarnings=FALSE)
+dir.create(file.path(base_dir,"metrics"), showWarnings=FALSE)
+dir.create(file.path(base_dir,"review_panels"), showWarnings=FALSE)
+
+mask <- file.path(base_dir,"mask","HemiPhotoMask.svg")
+
+image_mask <- image_read(mask) |>
+  image_transparent("white") |>
+  image_convert("png")
+```
+
+ convert 360 to hemisphere and mask (if required)
+```{r}
+source("./_functions/process_360_image.R")
+
+files_360 <- list.files(
+  "./canopy_photos/raw_360",
+  pattern = "\\.(jpg|jpeg|png|dng|svg)$",
+  recursive = TRUE,
+  full.names = TRUE,
+  ignore.case = TRUE
+)
+#selected_files_360 <-
+future_lapply(
+    files_360,
+    process_360_image,
+    output_dir = "./canopy_photos/converted_360",
+    mask_path = mask
+)
+
+```
+
+resize and mask hemisphere photos
+```{r}
+source("./_functions/process_hemi_image.R")
+files_hemi <- list.files(
+  "./canopy_photos/raw_hemi",
+  pattern = "\\.(jpg|jpeg|png|dng|svg)$",
+  recursive = TRUE,
+  full.names = TRUE,
+  ignore.case = TRUE
+)
+image_mask <- image_read(
+  "./canopy_photos/mask/hemisphere_mask_3000.png"
+)
+plan(multisession, workers = 4)
+#selected_files_hemi <-
+tic()
+  future_lapply(
+  files_hemi,
+  process_hemi_image,
+  output_dir = "./canopy_photos/standardized_hemi",
+  image_mask = image_mask,
+  future.seed = TRUE
+)
+  toc()#460secs
+```
+
+generate canopy metrics and compare to help select best image settings
+```{r}
+source("./_functions/binarize_image.R")
+
+options <- expand.grid(
+  channel = c("2BG"),
+  gamma = c(1.0, 1.3, 1.6, 1.9),
+  stretch = c(FALSE),
+  stringsAsFactors = FALSE
+)
+
+
+selected_images <- list.files(
+  file.path(base_dir,"standardized_hemi"),
+  full.names=TRUE
+)
+
+# selected_images <- selected_images[
+#   seq(1, length(selected_images), by = 20)
+# ]
+
+process_image <- function(img, options) {
+
+  cat("Processing", basename(img), "\n")
+
+  results <- vector("list", nrow(options))
+
+  for(i in seq_len(nrow(options))) {
+
+    opt <- options[i, ]
+
+    result <- binarize_image(
+      image_file = img,
+      method     = "Otsu",
+      channel    = opt$channel,
+      gamma      = opt$gamma,
+      stretch    = opt$stretch
+    )
+
+    gapfrac <- gapfrac_fisheye(
+      result$binary,
+      maxVZA = 90,
+      lens = "equidistant",
+      endVZA = 70,
+      display = FALSE,
+      message = FALSE
+    )
+
+    canopy <- canopy_fisheye(gapfrac)
+
+    results[[i]] <- canopy |>
+      mutate(
+        Image = result$image,
+        Method = "Otsu",
+        Channel = opt$channel,
+        Gamma = opt$gamma,
+        Stretch = opt$stretch,
+        OptionID = i
+      )
+
+  }
+
+  bind_rows(results)
+
+}
+
+tic()
+
+all_metrics <- future_lapply(
+  selected_images,
+  process_image,
+  options = options,
+  future.seed = TRUE
+)
+
+toc()
+
+metric_table <- bind_rows(all_metrics)
+
+
+fwrite(
+  metric_table,
+  file.path(
+    base_dir,
+    "metrics",
+    "otsu_option_comparison.csv"
+  )
+)
+```
+
+
+```{r}
+source("./_functions/create_contact_sheets.R")
+create_contact_sheets(
+  original_dir = file.path(base_dir, "standardized_hemi"),
+  binary_dir = file.path(base_dir, "binarized/Otsu"),
+  output_dir = file.path(base_dir, "contact_sheets")
+)
+
+
+```
+Create final binarized files and calculate metrics
+```{r}
+
+source("./_functions/binarize_image.R")
+
+options <- expand.grid(
+  channel = c("2BG"),
+  gamma = c(1.6),
+  stretch = c(FALSE),
+  stringsAsFactors = FALSE
+)
+
+
+selected_images <- list.files(
+  file.path(base_dir,"standardized_hemi"),
+  full.names=TRUE
+)
+
+# selected_images <- selected_images[
+#   seq(1, length(selected_images), by = 20)
+# ]
+
+process_image <- function(img, options) {
+
+  cat("Processing", basename(img), "\n")
+
+  results <- vector("list", nrow(options))
+
+  for(i in seq_len(nrow(options))) {
+
+    opt <- options[i, ]
+
+    result <- binarize_image(
+      image_file = img,
+      method     = "Otsu",
+      channel    = opt$channel,
+      gamma      = opt$gamma,
+      stretch    = opt$stretch
+    )
+
+    gapfrac <- gapfrac_fisheye(
+      result$binary,
+      maxVZA = 90,
+      lens = "equidistant",
+      endVZA = 70,
+      display = FALSE,
+      message = FALSE
+    )
+
+    canopy <- canopy_fisheye(gapfrac)
+
+    results[[i]] <- canopy |>
+      mutate(
+        Image = result$image,
+        Method = "Otsu",
+        Channel = opt$channel,
+        Gamma = opt$gamma,
+        Stretch = opt$stretch,
+        OptionID = i
+      )
+
+  }
+
+  bind_rows(results)
+
+}
+
+tic()
+
+all_metrics <- future_lapply(
+  selected_images,
+  process_image,
+  options = options,
+  future.seed = TRUE
+)
+
+toc()
+
+metric_table <- bind_rows(all_metrics)
+
+
+fwrite(
+  metric_table,
+  file.path(
+    base_dir,
+    "canopy_metrics_final",
+    "canopy_light_data.csv"
+  )
+)
+```
+```
+
+
+```{r}
+library(dplyr)
+library(ggplot2)
+
+metric_table$plot_id <- sapply(
+  strsplit(metric_table$id, "_"),
+  \(x) paste(x[1:2], collapse = "_")
+)
+ggplot(
+  metric_table,
+  aes(
+    x = plot_id,
+    y = DIFN
+  )
+) +
+  geom_boxplot() +
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(
+      angle = 90,
+      hjust = 1
+    )
+  ) +
+  ylab("DIFN") +
+  xlab("Plot ID")
+```
+
+
